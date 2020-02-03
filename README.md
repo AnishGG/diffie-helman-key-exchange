@@ -26,5 +26,5 @@ The protocol messages used in the implementation are provided below
 |   40   |   REQCOM   |              Request completion message from the server to the client             |
 |   50   | DISCONNECT |           Disconnect request message sent from the client to the server           |
 
-..* All the global settings are stored in `settings.py` present in the root directory.
-..* The common data structures and functions used by server and client side are stored in `common.py` also present in the root directory.
+⋅⋅* All the global settings are stored in `settings.py` present in the root directory.
+⋅⋅* The common data structures and functions used by server and client side are stored in `common.py` also present in the root directory.
