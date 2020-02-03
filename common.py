@@ -215,16 +215,25 @@ def GeneratePrimitiveRoot(p):
 """
 To encrypt a block of message
 """
-def encrypt(msg, shared_key):
-    key = shared_key.get_key()
-    key0 = DesKey(bytes(key, 'utf-8'))
+def encrypt(msg, shared_keys):
+    a, b, c = shared_keys[0].get_key(), shared_keys[1].get_key(), shared_keys[2].get_key()
+    key0 = DesKey(bytes(a, 'utf-8'))
+    key1 = DesKey(bytes(b, 'utf-8'))
+    key2 = DesKey(bytes(c, 'utf-8'))
     ret = key0.encrypt(msg, padding=True)
+    ret = key1.decrypt(ret)
+    ret = key2.encrypt(ret)
     return ret
 
-def decrypt(msg, shared_key):
-    key = shared_key.get_key()
-    key0 = DesKey(bytes(key, 'utf-8'))
-    return key0.decrypt(msg, padding=True)
+def decrypt(msg, shared_keys):
+    a, b, c = shared_keys[0].get_key(), shared_keys[1].get_key(), shared_keys[2].get_key()
+    key0 = DesKey(bytes(a, 'utf-8'))
+    key1 = DesKey(bytes(b, 'utf-8'))
+    key2 = DesKey(bytes(c, 'utf-8'))
+    ret = key2.decrypt(msg)
+    ret = key1.encrypt(ret)
+    ret = key0.decrypt(ret, padding=True)
+    return ret
 
 """
 Function extends the message when size of the message is less than the buffer
@@ -237,7 +246,7 @@ def handle_message_size(msg, hdr):
 """
 Helper function to send a file over a connection
 """
-def send_file(conn, file_name, source_add, dest_add, shared_key):
+def send_file(conn, file_name, source_add, dest_add, shared_keys):
     hdr = Hdr(30, source_add, dest_add)
     f = open(file_name, 'rb')
 
@@ -247,7 +256,7 @@ def send_file(conn, file_name, source_add, dest_add, shared_key):
         final_text += l
         l = f.read(1024)
     f.close()
-    final_text = encrypt(final_text, shared_key)
+    final_text = encrypt(final_text, shared_keys)
     w = open("tmp.txt", 'wb')
     w.write(final_text)
     w.close()
@@ -277,7 +286,7 @@ def send_file(conn, file_name, source_add, dest_add, shared_key):
 """
 Helper function to save the file at client side
 """
-def recv_file(conn, file_name, shared_key):
+def recv_file(conn, file_name, shared_keys):
     f = open(file_name, 'wb')
     packet = conn.recv(1024)
     packet = pickle.loads(packet)
@@ -289,7 +298,7 @@ def recv_file(conn, file_name, shared_key):
         final_text += packet.get_msg().strip(b'~')
         packet = conn.recv(1024)
         packet = pickle.loads(packet)
-    data = decrypt(final_text, shared_key)
+    data = decrypt(final_text, shared_keys)
     f.write(data)
     return "File recieving done"
 

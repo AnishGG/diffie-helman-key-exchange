@@ -50,5 +50,5 @@ if __name__ == "__main__":
     msg = Msg(hdr, "input.txt")
     send_data(tcpClientA, pickle.dumps(msg))
 
-    print(recv_file(tcpClientA, "input.txt", shared_a))
+    print(recv_file(tcpClientA, "input.txt", [shared_a, shared_b, shared_c]))
     tcpClientA.close() 

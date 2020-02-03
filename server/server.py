@@ -56,14 +56,19 @@ class ClientThread(Thread):
         send_data(conn, pickle.dumps(msg_b))
         send_data(conn, pickle.dumps(msg_c))
 
-        while 1: # serve the client according to the requests arrived
+        while True: # serve the client according to the requests arrived
             msg = pickle.loads(recv_data(conn))
 
             if msg.type() == "REQSERV":
                 file_name = msg.get_msg()
                 # now check if this file is present in the file system
                 if os.path.isfile('data/' + file_name):    # Check if file available in the server
-                    send_file(conn, 'data/' + file_name, TCP_PORT, self.port, shared_a)
+                    send_file(conn,
+                              'data/' + file_name,
+                              TCP_PORT,
+                              self.port,
+                              [shared_a, shared_b, shared_c]
+                              )
                 else:
                     # send disconnect
                     hdr = Hdr(50, TCP_PORT, self.port)
