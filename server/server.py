@@ -63,7 +63,7 @@ class ClientThread(Thread):
                 file_name = msg.get_msg()
                 # now check if this file is present in the file system
                 if os.path.isfile('data/' + file_name):    # Check if file available in the server
-                    send_file(conn, 'data/' + file_name, TCP_PORT, self.port)
+                    send_file(conn, 'data/' + file_name, TCP_PORT, self.port, shared_a)
                 else:
                     # send disconnect
                     hdr = Hdr(50, TCP_PORT, self.port)

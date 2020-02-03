@@ -29,6 +29,14 @@ class sharedKey:
     def __str__(self):
         return "Public key: %s" % self.Y
 
+    def get_key(self):
+        ret = str(self.Y)
+        if len(ret) >= 8:
+            ret = ret[0:8]
+        else:
+            ret = ret.ljust(8, '0')
+        return ret
+
 class PubKey:
     """ 
     Class to store the public keys
@@ -205,6 +213,20 @@ def GeneratePrimitiveRoot(p):
             return a
 
 """
+To encrypt a block of message
+"""
+def encrypt(msg, shared_key):
+    key = shared_key.get_key()
+    key0 = DesKey(bytes(key, 'utf-8'))
+    ret = key0.encrypt(msg, padding=True)
+    return ret
+
+def decrypt(msg, shared_key):
+    key = shared_key.get_key()
+    key0 = DesKey(bytes(key, 'utf-8'))
+    return key0.decrypt(msg, padding=True)
+
+"""
 Function extends the message when size of the message is less than the buffer
 size
 """
@@ -215,23 +237,36 @@ def handle_message_size(msg, hdr):
 """
 Helper function to send a file over a connection
 """
-def send_file(conn, file_name, source_add, dest_add):
+def send_file(conn, file_name, source_add, dest_add, shared_key):
     hdr = Hdr(30, source_add, dest_add)
     f = open(file_name, 'rb')
+
+    final_text = b""
+    l = f.read(1024)
+    while l:
+        final_text += l
+        l = f.read(1024)
+    f.close()
+    final_text = encrypt(final_text, shared_key)
+    w = open("tmp.txt", 'wb')
+    w.write(final_text)
+    w.close()
+    f1 = open("tmp.txt", 'rb')
 
     msg = Msg(hdr, "")      # Test msg to find empty msg's size
     szz = len(pickle.dumps(msg))
 
-    l = f.read(1024 - szz)
+    l = f1.read(1024 - szz)
+
     msg = Msg(hdr, l)
     assert(len(pickle.dumps(msg)) <= 1024)
     while l:
         # Handling when size of the message to be sent is less than buffer size
         handle_message_size(msg, hdr)
         conn.send(pickle.dumps(msg))
-        l = f.read(1024 - szz)
+        l = f1.read(1024 - szz)
         msg = Msg(hdr, l)
-    f.close()
+    f1.close()
 
     hdr = Hdr(40, source_add, dest_add)
     msg = Msg(hdr, "File sending done")
@@ -242,18 +277,20 @@ def send_file(conn, file_name, source_add, dest_add):
 """
 Helper function to save the file at client side
 """
-def recv_file(conn, file_name):
+def recv_file(conn, file_name, shared_key):
     f = open(file_name, 'wb')
     packet = conn.recv(1024)
     packet = pickle.loads(packet)
     if packet.type() == "DISCONNECT":
         return "DISCONNECT"
 
+    final_text = b""
     while packet.type() == "ENCMSG":
-        data = bytes(packet.get_msg().decode('utf-8').strip('~'), 'utf-8')
-        f.write(data)
+        final_text += packet.get_msg().strip(b'~')
         packet = conn.recv(1024)
         packet = pickle.loads(packet)
+    data = decrypt(final_text, shared_key)
+    f.write(data)
     return "File recieving done"
 
 """
