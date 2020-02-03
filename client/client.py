@@ -5,14 +5,16 @@ import random
 import sys
 sys.path.append("../")
 from common import send_file, recv_file, sharedKey, PubKey, send_data, recv_data, Hdr, Msg
+import settings
 
 if __name__ == "__main__":
-    host = socket.gethostname() 
-    port = 2004
+    port = settings.TCP_PORT
+    host = settings.TCP_IP
+    if len(sys.argv) > 1:
+        host = sys.argv[1]
      
     tcpClientA = socket.socket(socket.AF_INET, socket.SOCK_STREAM) 
     tcpClientA.connect((host, port))
-    print(tcpClientA.getsockname())
 
     # Create 3 public keys to be shared with the server
     a, b, c = PubKey(), PubKey(), PubKey()
@@ -24,7 +26,7 @@ if __name__ == "__main__":
     c.gen_pub_key(private_c)
 
     # Create header for public key sharing
-    hdr = Hdr(10, tcpClientA.getsockname(), port)
+    hdr = Hdr(settings.PUBKEY, tcpClientA.getsockname(), port)
     msg_a = Msg(hdr, a)
     msg_b = Msg(hdr, b)
     msg_c = Msg(hdr, c)
@@ -43,12 +45,33 @@ if __name__ == "__main__":
     shared_b = sharedKey(server_pub_b, private_b)
     shared_c = sharedKey(server_pub_c, private_c)
 
-    print("Sharing of key over")
+    print("Sharing of key over\n")
 
-    # Send a REQSERV msg
-    hdr = Hdr(20, tcpClientA.getsockname(), port)
-    msg = Msg(hdr, "input.txt")
-    send_data(tcpClientA, pickle.dumps(msg))
+    print("Type the operation to be executed at the server.")
+    print("Type 'help' without quotes to get the list of operations.")
+    while True: # Till a disconnect is sent from client, continue conversing with server
+        operation = input()
+        operation = operation.split(" ")
+        if operation[0] == "help":
+            print("---> REQSERV <Filename> - To download file from server")
+            print("---> DISCONNECT - To end the connection")
 
-    print(recv_file(tcpClientA, "input.txt", [shared_a, shared_b, shared_c]))
+        elif operation[0] == "REQSERV":
+            file_name = operation[1]
+            hdr = Hdr(settings.REQSERV, tcpClientA.getsockname(), port)
+            msg = Msg(hdr, file_name)
+            send_data(tcpClientA, pickle.dumps(msg))
+            response = recv_file(tcpClientA, file_name, [shared_a, shared_b, shared_c])
+            print(response)
+
+        elif operation[0] == "DISCONNECT":
+            hdr = Hdr(settings.DISCONNECT, tcpClientA.getsockname(), port)
+            msg = Msg(hdr, "Disconnect from the server")
+            send_data(tcpClientA, pickle.dumps(msg))
+            tcpClientA.close()
+            print("Connection closed with server")
+            break
+        else:
+            print("operation ", operation, " not valid")
+            print("Type 'help' without quotes to get the list of operations")
     tcpClientA.close() 

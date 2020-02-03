@@ -7,9 +7,7 @@ from threading import Thread
 from socketserver import ThreadingMixIn
 sys.path.append("../")
 from common import Hdr, Msg, sharedKey, send_file, recv_file, send_data, recv_data, PubKey
-
-TCP_IP = '0.0.0.0' 
-TCP_PORT = 2004 
+import settings
 
 # Multithreaded Python server : TCP Server Socket Thread Pool
 class ClientThread(Thread): 
@@ -47,7 +45,7 @@ class ClientThread(Thread):
         shared_c = sharedKey(client_pub_c, private_c_server)
 
         # Send the 3 public keys of server to client
-        hdr = Hdr(10, TCP_PORT, self.port)
+        hdr = Hdr(10, settings.TCP_PORT, self.port)
         msg_a = Msg(hdr, server_pub_a)
         msg_b = Msg(hdr, server_pub_b)
         msg_c = Msg(hdr, server_pub_c)
@@ -65,23 +63,28 @@ class ClientThread(Thread):
                 if os.path.isfile('data/' + file_name):    # Check if file available in the server
                     send_file(conn,
                               'data/' + file_name,
-                              TCP_PORT,
+                              settings.TCP_PORT,
                               self.port,
                               [shared_a, shared_b, shared_c]
                               )
                 else:
                     # send disconnect
-                    hdr = Hdr(50, TCP_PORT, self.port)
+                    hdr = Hdr(50, settings.TCP_PORT, self.port)
                     msg_dc = Msg(hdr, "File not present in server")
                     send_data(conn, pickle.dumps(msg_dc))
                     break
+
+            if msg.type() == "DISCONNECT":
+                # Disconnect this client from the server
+                print("Client disconnected from the server")
+                break
 
 if __name__ == "__main__":
     BUFFER_SIZE = 1024 
 
     tcpServer = socket.socket(socket.AF_INET, socket.SOCK_STREAM) 
     tcpServer.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1) 
-    tcpServer.bind((TCP_IP, TCP_PORT)) 
+    tcpServer.bind((settings.TCP_IP, settings.TCP_PORT)) 
     threads = [] 
      
     while True: 
@@ -92,7 +95,5 @@ if __name__ == "__main__":
         newthread.start() 
         threads.append(newthread) 
      
-    """
     for t in threads: 
         t.join()
-    """

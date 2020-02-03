@@ -6,11 +6,7 @@ import random
 import pickle
 from datetime import datetime
 from des import DesKey
-
-MAX_ITERATION = 15
-MAX_N = 1e9
-MAX_SIZE = 1e6
-BUFFER_SIZE = 1024
+import settings
 
 class sharedKey:
     """
@@ -99,22 +95,22 @@ class Msg:
         return self.allmsg
 
     def type(self):
-        if self.hdr.get_opcode() == 10:
+        if self.hdr.get_opcode() == settings.PUBKEY:
             return "PUBKEY"
-        elif self.hdr.get_opcode() == 20:
+        elif self.hdr.get_opcode() == settings.REQSERV:
             return "REQSERV"
-        elif self.hdr.get_opcode() == 30:
+        elif self.hdr.get_opcode() == settings.ENCMSG:
             return "ENCMSG"
-        elif self.hdr.get_opcode() == 40:
+        elif self.hdr.get_opcode() == settings.REQCOM:
             return "REQCOM"
-        elif self.hdr.get_opcode() == 50:
+        elif self.hdr.get_opcode() == settings.DISCONNECT:
             return "DISCONNECT"
 
     def make_buff_size(self, final_length):
         add = '~'
         if isinstance(self.allmsg, bytes):
             add = bytes('~', 'utf-8')
-        self.allmsg = self.allmsg.ljust(1024-final_length, add)
+        self.allmsg = self.allmsg.ljust(settings.BUFFER_SIZE-final_length, add)
         
 
 """
@@ -145,7 +141,7 @@ def MillerRabinTest(value, iteration):
         q = int(q/2)
         k += 1
     for i in range(0, iteration):
-        a = (random.randint(0, MAX_N) % (value - 1)) + 1
+        a = (random.randint(0, settings.MAX_N) % (value - 1)) + 1
         current = q
         flag = 1
         mod_result = compute_exp_modulo(a, current, value)
@@ -166,11 +162,11 @@ def GeneratePrime():
     print("Running Miller-Rabin test to find a large prime number...\n")
     random.seed(datetime.now())
     while True:
-        current_value = random.randint(1, MAX_N) % MAX_N    # modulo MAX_N is redundant here
+        current_value = random.randint(1, settings.MAX_N) % settings.MAX_N    # modulo MAX_N is redundant here
         current_value = int(current_value)
         if((current_value&1) == 0):
             current_value += 1
-        if(MillerRabinTest(current_value, MAX_ITERATION) == 1):
+        if(MillerRabinTest(current_value, settings.MAX_ITERATION) == 1):
             return current_value
 
 
@@ -179,22 +175,22 @@ Generate the primitive root by checking for random numbers
 """
 def GeneratePrimitiveRoot(p):
     # Construct sieve of primes
-    sieve = [0 for i in range(int(MAX_SIZE)+1)]
+    sieve = [0 for i in range(int(settings.MAX_SIZE)+1)]
     sieve[0] = sieve[1] = 1
     i = 4
-    while i < MAX_SIZE:
+    while i < settings.MAX_SIZE:
         sieve[i] = 1
         i += 2
     i = 3
-    while i < MAX_SIZE:
+    while i < settings.MAX_SIZE:
         if sieve[i] == 0:
             j = 2 * i
-            while j < MAX_SIZE:
+            while j < settings.MAX_SIZE:
                 sieve[j] = 1
                 j += i
         i += 2
     while True:
-        a = random.randint(0, MAX_N) % (p - 2) + 2
+        a = random.randint(0, settings.MAX_N) % (p - 2) + 2
         phi = p - 1
         flag = 1
         root = int(math.sqrt(phi))
@@ -204,7 +200,7 @@ def GeneratePrimitiveRoot(p):
                 if mod_result == 1:
                     flag = 0
                     break
-                if MillerRabinTest(phi / i, MAX_ITERATION) and not (phi % int(phi/i)):
+                if MillerRabinTest(phi / i, settings.MAX_ITERATION) and not (phi % int(phi/i)):
                     mod_result = compute_exp_modulo(a, phi / (phi / i), p)
                     if mod_result == 1:
                         flag = 0
@@ -240,21 +236,21 @@ Function extends the message when size of the message is less than the buffer
 size
 """
 def handle_message_size(msg, hdr):
-    if len(pickle.dumps(msg)) < 1024:
+    if len(pickle.dumps(msg)) < settings.BUFFER_SIZE:
         msg.make_buff_size(len(pickle.dumps(Msg(hdr, ""))))
 
 """
 Helper function to send a file over a connection
 """
 def send_file(conn, file_name, source_add, dest_add, shared_keys):
-    hdr = Hdr(30, source_add, dest_add)
+    hdr = Hdr(settings.ENCMSG, source_add, dest_add)
     f = open(file_name, 'rb')
 
     final_text = b""
-    l = f.read(1024)
+    l = f.read(settings.BUFFER_SIZE)
     while l:
         final_text += l
-        l = f.read(1024)
+        l = f.read(settings.BUFFER_SIZE)
     f.close()
     final_text = encrypt(final_text, shared_keys)
     w = open("tmp.txt", 'wb')
@@ -265,19 +261,19 @@ def send_file(conn, file_name, source_add, dest_add, shared_keys):
     msg = Msg(hdr, "")      # Test msg to find empty msg's size
     szz = len(pickle.dumps(msg))
 
-    l = f1.read(1024 - szz)
+    l = f1.read(settings.BUFFER_SIZE - szz)
 
     msg = Msg(hdr, l)
-    assert(len(pickle.dumps(msg)) <= 1024)
+    assert(len(pickle.dumps(msg)) <= settings.BUFFER_SIZE)
     while l:
         # Handling when size of the message to be sent is less than buffer size
         handle_message_size(msg, hdr)
         conn.send(pickle.dumps(msg))
-        l = f1.read(1024 - szz)
+        l = f1.read(settings.BUFFER_SIZE - szz)
         msg = Msg(hdr, l)
     f1.close()
 
-    hdr = Hdr(40, source_add, dest_add)
+    hdr = Hdr(settings.REQCOM, source_add, dest_add)
     msg = Msg(hdr, "File sending done")
     handle_message_size(msg, hdr)
     conn.send(pickle.dumps(msg))
@@ -288,7 +284,7 @@ Helper function to save the file at client side
 """
 def recv_file(conn, file_name, shared_keys):
     f = open(file_name, 'wb')
-    packet = conn.recv(1024)
+    packet = conn.recv(settings.BUFFER_SIZE)
     packet = pickle.loads(packet)
     if packet.type() == "DISCONNECT":
         return "DISCONNECT"
@@ -296,7 +292,7 @@ def recv_file(conn, file_name, shared_keys):
     final_text = b""
     while packet.type() == "ENCMSG":
         final_text += packet.get_msg().strip(b'~')
-        packet = conn.recv(1024)
+        packet = conn.recv(settings.BUFFER_SIZE)
         packet = pickle.loads(packet)
     data = decrypt(final_text, shared_keys)
     f.write(data)
@@ -309,7 +305,7 @@ def send_data(conn, MESSAGE):
     msg = struct.pack('>I', len(MESSAGE)) + MESSAGE
     total_sent = 0
     while total_sent < len(msg):
-        sent = conn.send(msg[total_sent:total_sent+BUFFER_SIZE])
+        sent = conn.send(msg[total_sent:total_sent+settings.BUFFER_SIZE])
         if sent == 0:
             raise RuntimeError("socket connection broken")
         total_sent += sent
@@ -321,7 +317,7 @@ Read message length and unpack it into a integer
 def recv_data(conn):
     raw_msglen = recvall(conn, 4)
     if not raw_msglen:
-        raise RuntimeError("No data to recieve in the socket")
+        raise RuntimeError("No data to recieve in the socket; Aborting")
     msglen = struct.unpack('>I', raw_msglen)[0]
     return recvall(conn, msglen)
 
@@ -331,7 +327,7 @@ Helper function to recieve n bytes or return None if EOF is hit
 def recvall(conn, n):
     from_client = bytearray()
     while len(from_client) < n:
-        size_to_be_recieved = min(n, BUFFER_SIZE)
+        size_to_be_recieved = min(n, settings.BUFFER_SIZE)
         packet = conn.recv(size_to_be_recieved)
         if not packet:
             break
