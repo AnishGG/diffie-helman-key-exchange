@@ -22,11 +22,11 @@ apt-get install python3-pip
 
 To run the server and client, follow the given steps:
 ```bash
-cd server
+cd path-to-directory/server
 python3 server.py
 
 # Open a new terminal
-cd ../client
+cd path-to-directory/client
 python3 client.py 127.0.0.1
 
 # Type 'help' to find out all the commands
