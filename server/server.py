@@ -6,7 +6,7 @@ import random
 from threading import Thread
 from socketserver import ThreadingMixIn
 sys.path.append("../")
-from common import Hdr, Msg, sharedKey, send_file, recv_file, send_data, recv_data, PubKey
+from common import file_not_present, Hdr, Msg, sharedKey, send_file, recv_file, send_data, recv_data, PubKey
 import settings
 
 # Multithreaded Python server : TCP Server Socket Thread Pool
@@ -69,10 +69,10 @@ class ClientThread(Thread):
                               )
                 else:
                     # send disconnect
-                    hdr = Hdr(50, settings.TCP_PORT, self.port)
-                    msg_dc = Msg(hdr, "File not present in server")
-                    send_data(conn, pickle.dumps(msg_dc))
-                    break
+                    file_not_present(conn,
+                                     settings.TCP_PORT,
+                                     self.port
+                                     )
 
             if msg.type() == "DISCONNECT":
                 # Disconnect this client from the server

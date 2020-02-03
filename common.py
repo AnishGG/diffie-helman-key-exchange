@@ -243,20 +243,21 @@ def handle_message_size(msg, hdr):
 Helper function to send a file over a connection
 """
 def send_file(conn, file_name, source_add, dest_add, shared_keys):
+
     hdr = Hdr(settings.ENCMSG, source_add, dest_add)
     f = open(file_name, 'rb')
-
     final_text = b""
     l = f.read(settings.BUFFER_SIZE)
     while l:
         final_text += l
         l = f.read(settings.BUFFER_SIZE)
     f.close()
+
     final_text = encrypt(final_text, shared_keys)
-    w = open("tmp.txt", 'wb')
+    w = open("data/tmp.txt", 'wb')
     w.write(final_text)
     w.close()
-    f1 = open("tmp.txt", 'rb')
+    f1 = open("data/tmp.txt", 'rb')
 
     msg = Msg(hdr, "")      # Test msg to find empty msg's size
     szz = len(pickle.dumps(msg))
@@ -280,15 +281,26 @@ def send_file(conn, file_name, source_add, dest_add, shared_keys):
     print("FILE SENDING DONE")
 
 """
+Sends a disconnect request when a file is not present in the server
+"""
+def file_not_present(conn, source_add, dest_add):
+    hdr = Hdr(settings.DISCONNECT, source_add, dest_add)
+    final_text = b"File not found at server"
+    msg = Msg(hdr, final_text)
+    handle_message_size(msg, hdr)
+    conn.send(pickle.dumps(msg))
+    print("File not present in server")
+
+"""
 Helper function to save the file at client side
 """
 def recv_file(conn, file_name, shared_keys):
-    f = open(file_name, 'wb')
     packet = conn.recv(settings.BUFFER_SIZE)
     packet = pickle.loads(packet)
     if packet.type() == "DISCONNECT":
-        return "DISCONNECT"
+        return "File not present in server"
 
+    f = open(file_name, 'wb')
     final_text = b""
     while packet.type() == "ENCMSG":
         final_text += packet.get_msg().strip(b'~')
@@ -296,6 +308,7 @@ def recv_file(conn, file_name, shared_keys):
         packet = pickle.loads(packet)
     data = decrypt(final_text, shared_keys)
     f.write(data)
+    f.close()
     return "File recieving done"
 
 """
